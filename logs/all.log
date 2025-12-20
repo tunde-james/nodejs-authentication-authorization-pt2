@@ -1,0 +1,15 @@
+2025-12-20 03:26:04:264 [32minfo[39m: [32mServe ris running on port 5000}[39m
+2025-12-20 03:26:29:2629 [32minfo[39m: [32mServeris running on port 5000}[39m
+2025-12-20 03:26:31:2631 [32minfo[39m: [32mServer is running on port 5000}[39m
+2025-12-20 03:26:35:2635 [32minfo[39m: [32mServer is running on port 5000}[39m
+2025-12-20 03:26:52:2652 [35mhttp[39m: [35mGET / 404 139 - 8.605 ms ::1[39m
+2025-12-20 03:26:59:2659 [35mhttp[39m: [35mGET /health 200 45 - 7.217 ms ::1[39m
+2025-12-20 03:27:00:270 [35mhttp[39m: [35mGET /favicon.ico 404 150 - 2.199 ms ::1[39m
+2025-12-20 03:41:58:4158 [32minfo[39m: [32mServer is running on port 5000}[39m
+2025-12-20 03:42:05:425 [35mhttp[39m: [35mGET /api/docs 301 158 - 6.153 ms ::1[39m
+2025-12-20 03:42:05:425 [35mhttp[39m: [35mGET /api/docs/ 200 3106 - 4.761 ms ::1[39m
+2025-12-20 03:42:05:425 [35mhttp[39m: [35mGET /api/docs/swagger-ui-init.js 200 2112 - 0.567 ms ::1[39m
+2025-12-20 03:42:05:425 [35mhttp[39m: [35mGET /api/docs/swagger-ui.css 200 177183 - 25.815 ms ::1[39m
+2025-12-20 03:42:05:425 [35mhttp[39m: [35mGET /api/docs/swagger-ui-standalone-preset.js 200 252451 - 22.037 ms ::1[39m
+2025-12-20 03:42:06:426 [35mhttp[39m: [35mGET /api/docs/swagger-ui-bundle.js 200 1510271 - 22.974 ms ::1[39m
+2025-12-20 03:42:06:426 [35mhttp[39m: [35mGET /api/docs/favicon-32x32.png 200 628 - 5.138 ms ::1[39m
