@@ -3,9 +3,10 @@ import http from 'node:http';
 
 import app from './app';
 import { Logger } from './utils/logger';
-import { swaggerDocs } from './config/swagger';
+import { swaggerDocs } from './config/swagger.config';
+import { env } from './config/env.config';
 
-const PORT = process.env.PORT;
+const PORT = env.PORT;
 
 const server = http.createServer(app).listen(PORT, () => {
   Logger.info(`Server is running on port ${PORT}}`);
