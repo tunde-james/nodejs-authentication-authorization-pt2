@@ -12,3 +12,83 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum Role {
+  USER
+  ADMIN
+  DRIVER
+  RESTAURANT_OWNER
+}
+
+model User {
+  id              String  @id @default(uuid())
+  email           String  @unique
+  name            String?
+  passwordHash    String
+  role            Role    @default(USER)
+  isEmailVerified Boolean @default(false)
+
+  twoFactorEnabled Boolean @default(false)
+  twoFactorSecret  String?
+
+  tokenVersion Int @default(0)
+
+  resetPasswordToken   String?
+  resetPasswordExpires DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  loginHistory      LoginHistory[]
+  driverProfile     DriverProfile?
+  restaurantProfile RestaurantProfile?
+
+  @@map("users")
+}
+
+model DriverProfile {
+  id            String  @id @default(uuid())
+  userId        String  @unique
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  licenseNumber String?
+  vehicleType   String?
+  isVerified    Boolean @default(false)
+
+  @@map("driver_profiles")
+}
+
+model RestaurantProfile {
+  id             String  @id @default(uuid())
+  userId         String  @unique
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurantName String
+  address        String?
+  isVerified     Boolean @default(false)
+
+  @@map("restaurant_profiles")
+}
+
+model LoginHistory {
+  id        String  @id @default(uuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress String?
+  userAgent String?
+  device    String?
+  os        String?
+  browser   String?
+
+  loginTime DateTime @default(now())
+
+  @@map("login_history")
+}
+
+model TokenBlacklist {
+  id        String   @id @default(uuid())
+  jti       String   @unique
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+
+  @@map("token_blacklist")
+}
