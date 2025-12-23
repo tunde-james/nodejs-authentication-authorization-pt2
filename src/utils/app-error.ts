@@ -42,7 +42,7 @@ export class NotFoundException extends AppError {
 }
 
 export class BadRequestException extends AppError {
-  constructor(message = 'Bad Reques', errorCode?: ErrorCodeEnumType) {
+  constructor(message = 'Bad Request', errorCode?: ErrorCodeEnumType) {
     super(
       message,
       HttpStatus.BAD_REQUEST,
