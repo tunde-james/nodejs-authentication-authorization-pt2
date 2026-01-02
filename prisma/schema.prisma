@@ -28,6 +28,10 @@ model User {
   role            Role    @default(USER)
   isEmailVerified Boolean @default(false)
 
+  profilePicture String?
+  bio            String?
+  phone          String?
+
   twoFactorEnabled Boolean @default(false)
   twoFactorSecret  String?
 
@@ -36,12 +40,17 @@ model User {
   resetPasswordToken   String?
   resetPasswordExpires DateTime?
 
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  loginHistory      LoginHistory[]
-  driverProfile     DriverProfile?
-  restaurantProfile RestaurantProfile?
+  registrationHistory   RegistrationHistory?
+  loginHistory          LoginHistory[]
+  driverProfile         DriverProfile?
+  restaurantProfile     RestaurantProfile?
+  registrationHistoryId String?
 
   @@map("users")
 }
@@ -68,6 +77,23 @@ model RestaurantProfile {
   @@map("restaurant_profiles")
 }
 
+model RegistrationHistory {
+  id        String  @id @default(uuid())
+  userId    String  @unique
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress String?
+  userAgent String?
+  device    String?
+  os        String?
+  browser   String?
+  country   String?
+  city      String?
+
+  registeredAt DateTime @default(now())
+
+  @@map("registration_history")
+}
+
 model LoginHistory {
   id        String  @id @default(uuid())
   userId    String
@@ -77,6 +103,8 @@ model LoginHistory {
   device    String?
   os        String?
   browser   String?
+  country   String?
+  city      String?
 
   loginTime DateTime @default(now())
 
@@ -90,5 +118,6 @@ model TokenBlacklist {
 
   createdAt DateTime @default(now())
 
+  @@index([expiresAt])
   @@map("token_blacklist")
 }
