@@ -1,16 +1,25 @@
 import geoip from 'geoip-lite';
 import useragent from 'useragent';
+import { DeviceInfo } from '../@types/jwt.types';
 
 export function extractDeviceInfo(ipAddress: string, userAgentString: string) {
   const agent = useragent.parse(userAgentString);
-  const geo = geoip.lookup(ipAddress);
+
+  const fallback = (val: string) =>
+    val !== 'Other 0.0.0' ? val : 'Unknown (RAW UA: ' + userAgentString + ')';
+
+  let geo = null;
+
+  if (ipAddress !== '::1' && ipAddress !== '127.0.0.1') {
+    geo = geoip.lookup(ipAddress);
+  }
 
   return {
     ipAddress,
     userAgent: userAgentString,
-    device: agent.device.toString() || 'Unknown',
-    os: agent.os.toString() || 'Unknown',
-    browser: agent.toAgent() || 'Unknown',
+    device: fallback(agent.device.toString()) || 'Unknown',
+    os: fallback(agent.os.toString()) || 'Unknown',
+    browser: fallback(agent.toAgent()) || 'Unknown',
     country: geo?.country || null,
     city: geo?.city || null,
   };
@@ -25,9 +34,9 @@ export function getClientIp(req: {
   if (forwarded) {
     const ips = Array.isArray(forwarded)
       ? forwarded[0]
-      : forwarded.split(',')[0];
+      : forwarded.split(',')[0].trim();
 
-    return ips.trim();
+    return ips;
   }
 
   return req.ip || req.socket?.remoteAddress || 'Unknown';

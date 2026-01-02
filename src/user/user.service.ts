@@ -1,8 +1,9 @@
 import { DeviceInfo } from '../@types/jwt.types';
 import { Role } from '../@types/role.types';
+import { Prisma } from '../generated/prisma/client';
 import { hashedPassword } from '../lib/password-hash';
 import { prisma } from '../lib/prisma';
-import { RegisterDto } from './user.schema';
+import { RegisterDriverDto, RegisterDto } from './user.schema';
 
 export interface CreatedUser {
   id: string;
@@ -23,9 +24,13 @@ export class UserService {
     };
   }
 
-  async userExists(email: string): Promise<boolean> {
+  async userExists(
+    email: string,
+    tx?: Prisma.TransactionClient
+  ): Promise<boolean> {
+    const client = tx || prisma;
     const normalizedEmail = email.toLowerCase().trim();
-    const user = await prisma.user.findUnique({
+    const user = await client.user.findUnique({
       where: { email: normalizedEmail },
     });
     return !!user;
@@ -58,5 +63,40 @@ export class UserService {
     });
 
     return newUser;
+  }
+
+  async createDriver(
+    registerDto: RegisterDriverDto,
+    deviceInfo: DeviceInfo
+  ): Promise<CreatedUser | null> {
+    const { email, name, password, licenseNumber, vehicleType } = registerDto;
+    const normalizedEmail = email.toLowerCase().trim();
+
+    return await prisma.$transaction(async (tx) => {
+      if (await this.userExists(normalizedEmail, tx)) return null; // Now checks inside tx
+
+      const passwordHash = await hashedPassword(password);
+
+      const newUser = await tx.user.create({
+        data: {
+          email: normalizedEmail,
+          name,
+          passwordHash,
+          role: 'DRIVER',
+          driverProfile: {
+            create: {
+              licenseNumber,
+              vehicleType,
+            },
+          },
+          registrationHistory: {
+            create: this.createRegistrationHistoryData(deviceInfo),
+          },
+        },
+        select: { id: true, email: true, role: true },
+      });
+
+      return newUser;
+    });
   }
 }

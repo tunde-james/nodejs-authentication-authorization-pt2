@@ -42,4 +42,35 @@ const router = Router();
  */
 router.post('/register', asyncHandler(userController.register));
 
+/**
+ * @swagger
+ * /users/register/driver:
+ *   post:
+ *     summary: Register a new driver
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password, name, licenseNumber, vehicleType]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *               name:
+ *                 type: string
+ *               licenseNumber:
+ *                 type: string
+ *               vehicleType:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Registration successful
+ */
+router.post('/register/driver', asyncHandler(userController.registerDriver));
+
 export default router;
