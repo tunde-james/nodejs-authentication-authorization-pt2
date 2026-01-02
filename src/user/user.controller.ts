@@ -1,6 +1,10 @@
 import { Request, Response } from 'express';
 
-import { registerDriverSchema, registerSchema } from './user.schema';
+import {
+  registerDriverSchema,
+  registerRestaurantSchema,
+  registerSchema,
+} from './user.schema';
 import { extractDeviceInfo, getClientIp } from '../lib/device-info';
 import { UserService } from './user.service';
 import { HttpStatus } from '../config/http-status.config';
@@ -34,5 +38,20 @@ export const registerDriver = async (req: Request, res: Response) => {
     status: 'success',
     message:
       'Driver registration successful. Please check your email to verify your account.',
+  });
+};
+
+export const registerRestaurant = async (req: Request, res: Response) => {
+  const data = registerRestaurantSchema.parse(req.body);
+  const ip = getClientIp(req);
+  const userAgent = req.headers['user-agent'] || 'Unknown';
+  const deviceInfo = extractDeviceInfo(ip, userAgent);
+
+  const user = await userService.createRestaurant(data, deviceInfo);
+
+  res.status(HttpStatus.CREATED).json({
+    status: 'success',
+    message:
+      'Restaurant registration successful. Please check your email to verify your account.',
   });
 };

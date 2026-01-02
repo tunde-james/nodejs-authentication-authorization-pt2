@@ -73,4 +73,38 @@ router.post('/register', asyncHandler(userController.register));
  */
 router.post('/register/driver', asyncHandler(userController.registerDriver));
 
+/**
+ * @swagger
+ * /users/register/restaurant:
+ *   post:
+ *     summary: Register a new restaurant owner
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password, name, restaurantName, address]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *               name:
+ *                 type: string
+ *               restaurantName:
+ *                 type: string
+ *               address:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Registration successful
+ */
+router.post(
+  '/register/restaurant',
+  asyncHandler(userController.registerRestaurant)
+);
+
 export default router;
