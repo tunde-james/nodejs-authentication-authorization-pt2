@@ -8,6 +8,7 @@ import { errorHandler } from './middleware/error-handler';
 import { env } from './config/env.config';
 import { requestIdMiddleware } from './middleware/request-id.middleware';
 import userRoutes from './routes/v1/user.routes';
+import authRoutes from './routes/v1/auth.routes';
 
 const app: Express = express();
 
@@ -50,6 +51,7 @@ app.use(requestIdMiddleware);
 app.use(morganMiddleware);
 
 app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/auth', authRoutes);
 
 app.get('/health', (req, res) => {
   res.status(200).json({

@@ -1,6 +1,5 @@
 import geoip from 'geoip-lite';
 import useragent from 'useragent';
-import { DeviceInfo } from '../@types/jwt.types';
 
 export function extractDeviceInfo(ipAddress: string, userAgentString: string) {
   const agent = useragent.parse(userAgentString);

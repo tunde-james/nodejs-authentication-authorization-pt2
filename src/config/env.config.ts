@@ -21,6 +21,8 @@ const envSchema = z.object({
 
   APP_URL: z.url(),
 
+  FRONTEND_URL: z.url().optional(),
+
   SMTP_HOST: z.string().min(1),
   SMTP_PORT: z.string().transform((val) => parseInt(val, 10)),
   SMTP_USER: z.string().min(1),

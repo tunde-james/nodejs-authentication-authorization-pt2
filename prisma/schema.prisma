@@ -23,90 +23,106 @@ enum Role {
 model User {
   id              String  @id @default(uuid())
   email           String  @unique
-  name            String?
-  passwordHash    String
+  name            String
+  passwordHash    String  @map("password_hash")
   role            Role    @default(USER)
-  isEmailVerified Boolean @default(false)
+  isEmailVerified Boolean @default(false) @map("is_email_verified")
 
-  profilePicture String?
+  profilePicture String? @map("profile_picture")
   bio            String?
   phone          String?
 
-  twoFactorEnabled Boolean @default(false)
-  twoFactorSecret  String?
+  twoFactorEnabled Boolean @default(false) @map("two_factor_enabled")
+  twoFactorSecret  String? @map("two_factor_secret")
 
-  tokenVersion Int @default(0)
+  tokenVersion Int @default(0) @map("token_version")
 
-  resetPasswordToken   String?
-  resetPasswordExpires DateTime?
+  resetPasswordToken   String?   @map("reset_password_token")
+  resetPasswordExpires DateTime? @map("reset_password_expires")
 
-  failedLoginAttempts Int       @default(0)
-  lockedUntil         DateTime?
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  registrationHistory   RegistrationHistory?
-  loginHistory          LoginHistory[]
-  driverProfile         DriverProfile?
-  restaurantProfile     RestaurantProfile?
-  registrationHistoryId String?
+  registrationHistory     RegistrationHistory?
+  loginHistory            LoginHistory[]
+  driverProfile           DriverProfile?
+  restaurantProfile       RestaurantProfile?
+  emailVerificationTokens EmailVerificationToken[]
+  registrationHistoryId   String? @map("registration_history_id")
 
   @@map("users")
 }
 
 model DriverProfile {
   id            String  @id @default(uuid())
-  userId        String  @unique
+  userId        String  @unique @map("user_id")
   user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  licenseNumber String?
-  vehicleType   String?
-  isVerified    Boolean @default(false)
+  licenseNumber String? @map("license_number")
+  vehicleType   String? @map("vehicle_type")
+  isVerified    Boolean @default(false) @map("is_verified")
 
   @@map("driver_profiles")
 }
 
 model RestaurantProfile {
   id             String  @id @default(uuid())
-  userId         String  @unique
+  userId         String  @unique @map("user_id")
   user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  restaurantName String
+  restaurantName String  @map("restaurant_name")
   address        String?
-  isVerified     Boolean @default(false)
+  isVerified     Boolean @default(false) @map("is_verified")
 
   @@map("restaurant_profiles")
 }
 
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  email     String
+  expiresAt DateTime @map("expires_at")
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verification_token")
+}
+
 model RegistrationHistory {
   id        String  @id @default(uuid())
-  userId    String  @unique
+  userId    String  @unique @map("user_id")
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ipAddress String?
-  userAgent String?
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
   device    String?
   os        String?
   browser   String?
   country   String?
   city      String?
 
-  registeredAt DateTime @default(now())
+  registeredAt DateTime @default(now()) @map("registered_at")
 
   @@map("registration_history")
 }
 
 model LoginHistory {
   id        String  @id @default(uuid())
-  userId    String
+  userId    String  @map("user_id")
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ipAddress String?
-  userAgent String?
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
   device    String?
   os        String?
   browser   String?
   country   String?
   city      String?
 
-  loginTime DateTime @default(now())
+  loginTime DateTime @default(now()) @map("login_time")
 
   @@map("login_history")
 }
@@ -114,9 +130,9 @@ model LoginHistory {
 model TokenBlacklist {
   id        String   @id @default(uuid())
   jti       String   @unique
-  expiresAt DateTime
+  expiresAt DateTime @map("expires_at")
 
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([expiresAt])
   @@map("token_blacklist")

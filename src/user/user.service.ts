@@ -1,8 +1,9 @@
-import { DeviceInfo } from '../@types/jwt.types';
-import { Role } from '../@types/role.types';
-import { Prisma } from '../generated/prisma/client';
+import { DeviceInfo } from '../@types/device-info.types';
+import { HttpStatus } from '../config/http-status.config';
+import { Prisma, Role } from '../generated/prisma/client';
 import { hashedPassword } from '../lib/password-hash';
 import { prisma } from '../lib/prisma';
+import { AppError } from '../utils/app-error';
 import {
   RegisterDriverDto,
   RegisterDto,
@@ -13,6 +14,9 @@ export interface CreatedUser {
   id: string;
   email: string;
   role: Role;
+  name: string;
+  vehicleType?: string;
+  restaurantName?: string;
 }
 
 export class UserService {
@@ -43,12 +47,12 @@ export class UserService {
   async createUser(
     registerDto: RegisterDto,
     deviceInfo: DeviceInfo
-  ): Promise<CreatedUser | null> {
+  ): Promise<CreatedUser> {
     const { email, name, password } = registerDto;
     const normalizedEmail = email.toLowerCase().trim();
 
     if (await this.userExists(normalizedEmail)) {
-      return null;
+      throw new AppError('User already exists', HttpStatus.CONFLICT);
     }
 
     const passwordHash = await hashedPassword(password);
@@ -63,21 +67,28 @@ export class UserService {
           create: this.createRegistrationHistoryData(deviceInfo),
         },
       },
-      select: { id: true, email: true, role: true },
+      select: { id: true, email: true, role: true, name: true },
     });
 
-    return newUser;
+    return {
+      id: newUser.id,
+      email: newUser.email,
+      name: newUser.name,
+      role: newUser.role,
+    };
   }
 
   async createDriver(
     registerDto: RegisterDriverDto,
     deviceInfo: DeviceInfo
-  ): Promise<CreatedUser | null> {
+  ): Promise<CreatedUser> {
     const { email, name, password, licenseNumber, vehicleType } = registerDto;
     const normalizedEmail = email.toLowerCase().trim();
 
     return await prisma.$transaction(async (tx) => {
-      if (await this.userExists(normalizedEmail, tx)) return null; // Now checks inside tx
+      if (await this.userExists(normalizedEmail, tx)) {
+        throw new AppError('User already exists', HttpStatus.CONFLICT);
+      }
 
       const passwordHash = await hashedPassword(password);
 
@@ -97,22 +108,36 @@ export class UserService {
             create: this.createRegistrationHistoryData(deviceInfo),
           },
         },
-        select: { id: true, email: true, role: true },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          driverProfile: { select: { vehicleType: true } },
+        },
       });
 
-      return newUser;
+      return {
+        id: newUser.id,
+        email: newUser.email,
+        role: newUser.role,
+        name: newUser.name,
+        vehicleType: newUser.driverProfile?.vehicleType ?? undefined,
+      };
     });
   }
 
   async createRestaurant(
     restaurantDto: RegisterRestaurantDto,
     deviceInfo: DeviceInfo
-  ): Promise<CreatedUser | null> {
+  ): Promise<CreatedUser> {
     const { email, name, password, restaurantName, address } = restaurantDto;
     const normalizedEmail = email.toLowerCase().trim();
 
     return await prisma.$transaction(async (tx) => {
-      if (await this.userExists(normalizedEmail, tx)) return null;
+      if (await this.userExists(normalizedEmail, tx)) {
+        throw new AppError('User already exists', HttpStatus.CONFLICT);
+      }
 
       const passwordHash = await hashedPassword(password);
 
@@ -132,7 +157,13 @@ export class UserService {
             create: this.createRegistrationHistoryData(deviceInfo),
           },
         },
-        select: { id: true, email: true, role: true },
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          name: true,
+          restaurantProfile: { select: { restaurantName: true } },
+        },
       });
 
       return newUser;

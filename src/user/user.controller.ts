@@ -8,8 +8,10 @@ import {
 import { extractDeviceInfo, getClientIp } from '../lib/device-info';
 import { UserService } from './user.service';
 import { HttpStatus } from '../config/http-status.config';
+import { AuthService } from '../auth/auth.service';
 
 const userService = new UserService();
+const authService = new AuthService();
 
 export const register = async (req: Request, res: Response) => {
   const data = registerSchema.parse(req.body);
@@ -18,6 +20,12 @@ export const register = async (req: Request, res: Response) => {
   const deviceInfo = extractDeviceInfo(ip, userAgent);
 
   const user = await userService.createUser(data, deviceInfo);
+
+  await authService
+    .sendVerificationEmail(user.id, user.email, data.name, user.role)
+    .catch((err) => {
+      console.error('Failed to send verification email:', err);
+    });
 
   res.status(HttpStatus.CREATED).json({
     status: 'success',
@@ -34,6 +42,17 @@ export const registerDriver = async (req: Request, res: Response) => {
 
   const user = await userService.createDriver(data, deviceInfo);
 
+  await authService
+    .sendVerificationEmail(
+      user.id,
+      user.email,
+      data.name,
+      user.role
+    )
+    .catch((err) => {
+      console.error('Failed to send verification email:', err);
+    });
+
   res.status(HttpStatus.CREATED).json({
     status: 'success',
     message:
@@ -48,6 +67,13 @@ export const registerRestaurant = async (req: Request, res: Response) => {
   const deviceInfo = extractDeviceInfo(ip, userAgent);
 
   const user = await userService.createRestaurant(data, deviceInfo);
+
+  await authService.sendVerificationEmail(
+    user.id,
+    user.email,
+    data.name,
+    user.role
+  );
 
   res.status(HttpStatus.CREATED).json({
     status: 'success',
