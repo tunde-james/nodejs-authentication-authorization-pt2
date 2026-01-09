@@ -114,3 +114,28 @@ export const refreshTokenMobile = async (req: Request, res: Response) => {
     refreshToken: newAccessToken,
   });
 };
+
+export const logout = async (req: Request, res: Response) => {
+  const token = req.cookies.refreshToken || req.body.refreshToken;
+
+  if (!token) {
+    return res.status(HttpStatus.OK).json({
+      status: 'success',
+      message: 'Logged out successfully',
+    });
+  }
+
+  await authService.logout(token);
+
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure: env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/api/v1/auth',
+  });
+
+  res.status(HttpStatus.OK).json({
+    status: 'success',
+    message: 'Logged out successfully',
+  });
+};

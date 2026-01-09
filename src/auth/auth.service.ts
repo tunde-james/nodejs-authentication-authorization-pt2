@@ -249,4 +249,28 @@ export class AuthService {
       throw new AppError('Invalid or expired token', HttpStatus.UNAUTHORIZED);
     }
   }
+
+  async logout(token: string) {
+    try {
+      const payload = verifyRefreshToken(token);
+
+      const user = await prisma.user.findUnique({
+        where: { id: payload.sub },
+      });
+      if (!user || user.tokenVersion !== payload.tokenVersion) {
+        throw new AppError('Invalid token', HttpStatus.UNAUTHORIZED);
+      }
+
+      await prisma.tokenBlacklist.create({
+        data: {
+          jti: payload.jti,
+          expiresAt: new Date(payload.exp * 1000),
+        },
+      });
+    } catch (error) {
+      if (env.NODE_ENV === 'development') {
+        console.error('Logout error (non-critical):', error);
+      }
+    }
+  }
 }

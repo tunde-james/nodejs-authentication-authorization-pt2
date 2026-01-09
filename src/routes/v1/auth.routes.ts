@@ -118,4 +118,16 @@ router.post('/login', asyncHandler(authController.login));
 router.post('/refresh', asyncHandler(authController.refreshToken));
 router.post('/refresh/mobile', asyncHandler(authController.refreshTokenMobile));
 
+/**
+ * @swagger
+ * /auth/logout:
+ *   post:
+ *     summary: Logout user
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Logged out successfully
+ */
+router.post('/logout', asyncHandler(authController.logout));
+
 export default router;
