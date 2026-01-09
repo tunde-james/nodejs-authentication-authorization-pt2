@@ -61,4 +61,61 @@ router.post(
   asyncHandler(authController.resendVerificationEmail)
 );
 
+/**
+ * @swagger
+ * /auth/login:
+ *   post:
+ *     summary: Login user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *               twoFactorCode:
+ *                 type: string
+ *                 description: Required if 2FA is enabled
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *       401:
+ *         description: Invalid credentials
+ *       429:
+ *         description: Account locked due to too many failed attempts
+ */
+router.post('/login', asyncHandler(authController.login));
+
+/**
+ * @swagger
+ * /auth/refresh:
+ *   post:
+ *     summary: Refresh access token
+ *     tags: [Auth]
+ *     description: Accepts refresh token via cookie or request body (for mobile clients)
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *                 description: Required for mobile clients without cookie support
+ *     responses:
+ *       200:
+ *         description: Token refreshed
+ *       401:
+ *         description: Invalid or expired refresh token
+ */
+router.post('/refresh', asyncHandler(authController.refreshToken));
+router.post('/refresh/mobile', asyncHandler(authController.refreshTokenMobile));
+
 export default router;

@@ -51,7 +51,6 @@ model User {
   driverProfile           DriverProfile?
   restaurantProfile       RestaurantProfile?
   emailVerificationTokens EmailVerificationToken[]
-  registrationHistoryId   String? @map("registration_history_id")
 
   @@map("users")
 }
