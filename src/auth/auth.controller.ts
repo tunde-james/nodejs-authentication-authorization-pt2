@@ -4,7 +4,7 @@ import { AuthService } from './auth.service';
 import { AppError } from '../utils/app-error';
 import { HttpStatus } from '../config/http-status.config';
 import { handleVerificationResponse } from '../lib/email-verification-response';
-import { loginSchema } from './auth.schema';
+import { loginSchema, resetPasswordSchema } from './auth.schema';
 import { extractDeviceInfo, getClientIp } from '../lib/device-info';
 import { env } from '../config/env.config';
 
@@ -170,5 +170,26 @@ export const googleAuthCallbackHandler = async (
     status: 'success',
     accessToken,
     user,
+  });
+};
+
+export const forgotPassword = async (req: Request, res: Response) => {
+  const { email } = req.body;
+  if (email) await authService.forgotPassword(email);
+
+  res.status(HttpStatus.OK).json({
+    status: 'success',
+    message:
+      'If an account with this email exists, a password reset link has been sent.',
+  });
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+  const data = resetPasswordSchema.parse(req.body);
+  await authService.resetPassword(data.token, data.password);
+
+  res.status(HttpStatus.OK).json({
+    status: 'success',
+    message: 'Password reset successfully',
   });
 };

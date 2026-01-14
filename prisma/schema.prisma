@@ -37,8 +37,10 @@ model User {
 
   tokenVersion Int @default(0) @map("token_version")
 
-  resetPasswordToken   String?   @map("reset_password_token")
-  resetPasswordExpires DateTime? @map("reset_password_expires")
+  resetPasswordToken           String?   @map("reset_password_token")
+  resetPasswordExpires         DateTime? @map("reset_password_expires")
+  resetPasswordAttempts        Int       @default(0) @map("reset_password_attempts")
+  resetPasswordAttemptsResetAt DateTime? @map("reset_password_attempts_reset_at")
 
   failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
   lockedUntil         DateTime? @map("locked_until")

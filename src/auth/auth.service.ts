@@ -140,6 +140,21 @@ export class AuthService {
     await this.sendVerificationEmail(user.id, user.email, user.name, user.role);
   }
 
+  async sendPasswordResetEmail(
+    email: string,
+    resetToken: string
+  ): Promise<void> {
+    const resetUrl = `${env.APP_URL}/reset-password?token=${resetToken}`;
+
+    await sendEmail(
+      email,
+      'Reset Password',
+      `<p>You requested a password reset.</p>
+        <p><a href="${resetUrl}">Click here to reset your password</a></p>
+        <p>This link expires in 15 minutes.</p>`
+    );
+  }
+
   async login(loginDto: LoginDto, deviceInfo: DeviceInfo) {
     const { email, password, twoFactorCode } = loginDto;
     const normalizedEmail = email.toLowerCase().trim();
@@ -396,5 +411,89 @@ export class AuthService {
         },
       };
     });
+  }
+
+  async forgotPassword(email: string) {
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const hash = crypto.createHash('sha256').update(token).digest('hex');
+
+    if (user) {
+      const now = new Date();
+      const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
+      if (
+        user.resetPasswordAttemptsResetAt &&
+        user.resetPasswordAttemptsResetAt < oneHourAgo
+      ) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { resetPasswordAttempts: 0, resetPasswordAttemptsResetAt: now },
+        });
+        user.resetPasswordAttempts = 0;
+      }
+
+      if (user.resetPasswordAttempts >= 3) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        return;
+      }
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          resetPasswordToken: hash,
+          resetPasswordExpires: new Date(Date.now() + 15 * 60 * 1000),
+          resetPasswordAttempts: { increment: 1 },
+          resetPasswordAttemptsResetAt:
+            user.resetPasswordAttemptsResetAt || now,
+        },
+      });
+
+      await this.sendPasswordResetEmail(email, token);
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    try {
+      const hash = crypto.createHash('sha256').update(token).digest('hex');
+      const user = await prisma.user.findFirst({
+        where: {
+          resetPasswordToken: hash,
+          resetPasswordExpires: { gt: new Date() },
+        },
+      });
+
+      if (!user)
+        throw new AppError('Invalid or expired token', HttpStatus.BAD_REQUEST);
+
+      const passwordHash = await hashedPassword(newPassword);
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          passwordHash,
+          tokenVersion: { increment: 1 },
+          resetPasswordToken: null,
+          resetPasswordExpires: null,
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        },
+      });
+
+      await sendEmail(
+        user.email,
+        'Password Changed Successfully',
+        `<p>Your password was recently changed.</p>
+          <p>If you didn't make this change, please contact support immediately.</p>`
+      );
+    } catch (error) {
+      throw new AppError('Invalid or expired token', HttpStatus.BAD_REQUEST);
+    }
   }
 }

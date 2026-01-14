@@ -130,10 +130,135 @@ router.post('/refresh/mobile', asyncHandler(authController.refreshTokenMobile));
  */
 router.post('/logout', asyncHandler(authController.logout));
 
+/**
+ * @swagger
+ * /auth/google:
+ *   get:
+ *     summary: Start Google OAuth login flow
+ *     tags: [Auth]
+ *     description: Redirects to Google's authorization page to start OAuth2 login. Use this to initiate sign-in with Google.
+ *     parameters:
+ *       - in: query
+ *         name: redirectUri
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: Custom redirect URI after Google auth (defaults to env.GOOGLE_REDIRECT_URI)
+ *     responses:
+ *       302:
+ *         description: Redirects to Google auth URL
+ *       500:
+ *         description: Internal error if env vars are missing
+ */
 router.get('/google', asyncHandler(authController.googleAuthStartHandler));
+
+/**
+ * @swagger
+ * /auth/google/callback:
+ *   get:
+ *     summary: Handle Google OAuth callback
+ *     tags: [Auth]
+ *     description: Processes the authorization code from Google, exchanges for tokens, and logs in or registers the user. This is called by Google after user consent.
+ *     parameters:
+ *       - in: query
+ *         name: code
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Authorization code from Google
+ *       - in: query
+ *         name: state
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: Optional state parameter for CSRF protection
+ *       - in: query
+ *         name: redirectUri
+ *         schema:
+ *           type: string
+ *         required: false
+ *         description: Custom redirect URI (if provided in initial request)
+ *     responses:
+ *       200:
+ *         description: Login successful, returns accessToken and user info
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                 accessToken:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *       400:
+ *         description: Missing code or invalid Google response
+ *       401:
+ *         description: Invalid or unverified Google email
+ */
 router.get(
   '/google/callback',
   asyncHandler(authController.googleAuthCallbackHandler)
 );
+
+/**
+ * @swagger
+ * /auth/forgot-password:
+ *   post:
+ *     summary: Request password reset
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: Reset email sent (if account exists)
+ */
+router.post('/forgot-password', asyncHandler(authController.forgotPassword));
+
+/**
+ * @swagger
+ * /auth/reset-password:
+ *   post:
+ *     summary: Reset password
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token, password]
+ *             properties:
+ *               token:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *                 minLength: 8
+ *     responses:
+ *       200:
+ *         description: Password reset successful
+ *       400:
+ *         description: Invalid token
+ */
+router.post('/reset-password', asyncHandler(authController.resetPassword));
 
 export default router;
