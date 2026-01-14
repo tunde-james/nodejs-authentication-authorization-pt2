@@ -130,4 +130,10 @@ router.post('/refresh/mobile', asyncHandler(authController.refreshTokenMobile));
  */
 router.post('/logout', asyncHandler(authController.logout));
 
+router.get('/google', asyncHandler(authController.googleAuthStartHandler));
+router.get(
+  '/google/callback',
+  asyncHandler(authController.googleAuthCallbackHandler)
+);
+
 export default router;

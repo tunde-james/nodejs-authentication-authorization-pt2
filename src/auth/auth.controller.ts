@@ -10,6 +10,14 @@ import { env } from '../config/env.config';
 
 const authService = new AuthService();
 
+const REFRESH_TOKEN_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: env.NODE_ENV === 'production',
+  sameSite: 'strict' as const,
+  maxAge: 1 * 24 * 60 * 60 * 1000, // 1 day
+  path: '/api/v1/auth',
+};
+
 export const verifyEmail = async (req: Request, res: Response) => {
   const { token } = req.query;
 
@@ -61,13 +69,7 @@ export const login = async (req: Request, res: Response) => {
     deviceInfo
   );
 
-  res.cookie('refreshToken', refreshToken, {
-    httpOnly: true,
-    secure: env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 1 * 24 * 60 * 60 * 1000,
-    path: '/api/v1/auth',
-  });
+  res.cookie('refreshToken', refreshToken, REFRESH_TOKEN_COOKIE_OPTIONS);
 
   res.status(HttpStatus.OK).json({
     status: 'success',
@@ -85,13 +87,7 @@ export const refreshToken = async (req: Request, res: Response) => {
   const { accessToken, refreshToken: newRefreshToken } =
     await authService.refreshToken(token);
 
-  res.cookie('refreshToken', newRefreshToken, {
-    httpOnly: true,
-    secure: env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 1 * 24 * 60 * 60 * 1000,
-    path: '/api/v1/auth',
-  });
+  res.cookie('refreshToken', newRefreshToken, REFRESH_TOKEN_COOKIE_OPTIONS);
 
   res.status(HttpStatus.OK).json({
     status: 'success',
@@ -137,5 +133,42 @@ export const logout = async (req: Request, res: Response) => {
   res.status(HttpStatus.OK).json({
     status: 'success',
     message: 'Logged out successfully',
+  });
+};
+
+export const googleAuthStartHandler = async (req: Request, res: Response) => {
+  const redirectUri =
+    (req.query.redirectUri as string) || env.GOOGLE_REDIRECT_URI;
+  const url = await authService.getAuthStart(redirectUri);
+  res.redirect(url);
+};
+
+export const googleAuthCallbackHandler = async (
+  req: Request,
+  res: Response
+) => {
+  const code = req.query.code as string | undefined;
+  if (!code) {
+    throw new AppError('Missing code in callback', HttpStatus.BAD_REQUEST);
+  }
+
+  const redirectUri =
+    (req.query.redirectUri as string) || env.GOOGLE_REDIRECT_URI;
+  const ip = getClientIp(req);
+  const userAgent = req.headers['user-agent'] || 'Unknown';
+  const deviceInfo = extractDeviceInfo(ip, userAgent);
+
+  const { accessToken, refreshToken, user } = await authService.googleLogin(
+    code,
+    deviceInfo,
+    redirectUri
+  );
+
+  res.cookie('refreshToken', refreshToken, REFRESH_TOKEN_COOKIE_OPTIONS);
+
+  res.status(HttpStatus.OK).json({
+    status: 'success',
+    accessToken,
+    user,
   });
 };

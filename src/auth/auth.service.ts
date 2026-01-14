@@ -1,4 +1,6 @@
 import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
+import crypto from 'node:crypto';
 
 import { HttpStatus } from '../config/http-status.config';
 import { prisma } from '../lib/prisma';
@@ -16,7 +18,11 @@ import { env } from '../config/env.config';
 import { sendEmail } from '../config/email';
 import { LoginDto } from './auth.schema';
 import { DeviceInfo } from '../@types/device-info.types';
-import { comparePassword, getDummyHash } from '../lib/password-hash';
+import {
+  comparePassword,
+  getDummyHash,
+  hashedPassword,
+} from '../lib/password-hash';
 
 const WELCOME_MESSAGES: Record<Role, string> = {
   USER: 'Welcome to our platform!',
@@ -28,6 +34,20 @@ const WELCOME_MESSAGES: Record<Role, string> = {
 const GENERIC_LOGIN_ERROR = 'Invalid email or password';
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
+
+const getGoogleClient = (redirectUri: string) => {
+  const clientId = env.GOOGLE_CLIENT_ID;
+  const clientSecret = env.GOOGLE_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret || !redirectUri) {
+    throw new AppError(
+      'Missing Google OAuth env vars',
+      HttpStatus.INTERNAL_SERVER_ERROR
+    );
+  }
+
+  return new OAuth2Client(clientId, clientSecret, redirectUri);
+};
 
 export class AuthService {
   sendVerificationEmail = async (
@@ -272,5 +292,109 @@ export class AuthService {
         console.error('Logout error (non-critical):', error);
       }
     }
+  }
+
+  async getAuthStart(redirectUri: string) {
+    const client = getGoogleClient(redirectUri);
+
+    const url = client.generateAuthUrl({
+      access_type: 'offline',
+      prompt: 'consent',
+      scope: ['openid', 'email', 'profile'],
+    });
+
+    return url;
+  }
+
+  async googleLogin(code: string, deviceInfo: DeviceInfo, redirectUri: string) {
+    const client = getGoogleClient(redirectUri);
+
+    const { tokens } = await client.getToken(code);
+    if (!tokens.id_token) {
+      throw new AppError('No ID token from Google', HttpStatus.BAD_REQUEST);
+    }
+
+    const ticket = await client.verifyIdToken({
+      idToken: tokens.id_token,
+      audience: env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+
+    if (!payload || !payload.email || !payload.email_verified) {
+      throw new AppError(
+        'Invalid or unverified Google email',
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    const normalizedEmail = payload.email.toLowerCase().trim();
+
+    return prisma.$transaction(async (tx) => {
+      let user = await tx.user.findUnique({
+        where: { email: normalizedEmail },
+      });
+
+      if (!user) {
+        const randomPassword = crypto.randomBytes(32).toString('hex');
+        const passwordHash = await hashedPassword(randomPassword);
+
+        user = await tx.user.create({
+          data: {
+            email: normalizedEmail,
+            name: payload.name || 'Unnamed User',
+            passwordHash,
+            isEmailVerified: true,
+            role: 'USER',
+            registrationHistory: {
+              create: {
+                ipAddress: deviceInfo.ipAddress,
+                userAgent: deviceInfo.userAgent,
+                device: deviceInfo.device,
+                os: deviceInfo.os,
+                browser: deviceInfo.browser,
+                country: deviceInfo.country,
+                city: deviceInfo.city,
+              },
+            },
+          },
+        });
+      } else if (!user.isEmailVerified) {
+        await tx.user.update({
+          where: { id: user.id },
+          data: { isEmailVerified: true },
+        });
+      }
+
+      await tx.loginHistory.create({
+        data: {
+          userId: user.id,
+          ipAddress: deviceInfo.ipAddress,
+          userAgent: deviceInfo.userAgent,
+          device: deviceInfo.device,
+          os: deviceInfo.os,
+          browser: deviceInfo.browser,
+          country: deviceInfo.country,
+          city: deviceInfo.city,
+        },
+      });
+
+      const accessToken = createAccessToken(
+        user.id,
+        user.role,
+        user.tokenVersion
+      );
+      const refreshToken = createRefreshToken(user.id, user.tokenVersion);
+
+      return {
+        accessToken,
+        refreshToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+        },
+      };
+    });
   }
 }
