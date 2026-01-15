@@ -3,6 +3,7 @@ import { Router } from 'express';
 import * as authController from '../../auth/auth.controller';
 import { asyncHandler } from '../../utils/async-handler';
 import { requireAuth } from '../../middleware/auth';
+import { authLimiter } from '../../middleware/rate-limit';
 
 const router = Router();
 
@@ -92,7 +93,7 @@ router.post(
  *       429:
  *         description: Account locked due to too many failed attempts
  */
-router.post('/login', asyncHandler(authController.login));
+router.post('/login', authLimiter, asyncHandler(authController.login));
 
 /**
  * @swagger
