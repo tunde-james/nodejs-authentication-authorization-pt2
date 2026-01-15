@@ -23,6 +23,8 @@ import {
   getDummyHash,
   hashedPassword,
 } from '../lib/password-hash';
+import { authenticator } from 'otplib';
+import { generateBackupCodes, hashBackupCode } from '../lib/backup-codes';
 
 const WELCOME_MESSAGES: Record<Role, string> = {
   USER: 'Welcome to our platform!',
@@ -159,36 +161,95 @@ export class AuthService {
     const { email, password, twoFactorCode } = loginDto;
     const normalizedEmail = email.toLowerCase().trim();
 
-    return prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({
-        where: { email: normalizedEmail },
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (!user) {
+      await comparePassword(await getDummyHash(), password);
+      throw new AppError(GENERIC_LOGIN_ERROR, HttpStatus.UNAUTHORIZED);
+    }
+
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      const remainingMinutes =
+        Math.ceil(user.lockedUntil.getTime() - Date.now()) / 60000;
+      throw new AppError(
+        `Account is locked. Try again in ${remainingMinutes} minutes(s).`,
+        HttpStatus.TOO_MANY_REQUEST
+      );
+    }
+
+    const isValidPassword = await comparePassword(user.passwordHash, password);
+    if (!isValidPassword) {
+      const newFailedAttempts = user.failedLoginAttempts + 1;
+      const shouldLock = newFailedAttempts >= MAX_FAILED_ATTEMPTS;
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          failedLoginAttempts: newFailedAttempts,
+          lockedUntil: shouldLock
+            ? new Date(Date.now() + LOCKOUT_DURATION_MS)
+            : null,
+        },
       });
 
-      if (!user) {
-        await comparePassword(await getDummyHash(), password);
+      throw new AppError(GENERIC_LOGIN_ERROR, HttpStatus.UNAUTHORIZED);
+    }
+
+    if (!user.isEmailVerified) {
+      throw new AppError(GENERIC_LOGIN_ERROR, HttpStatus.UNAUTHORIZED);
+    }
+
+    if (user.twoFactorEnabled) {
+      if (!twoFactorCode) {
         throw new AppError(GENERIC_LOGIN_ERROR, HttpStatus.UNAUTHORIZED);
       }
 
-      if (user.lockedUntil && user.lockedUntil > new Date()) {
-        const remainingMinutes =
-          Math.ceil(user.lockedUntil.getTime() - Date.now()) / 60000;
+      if (!user.twoFactorSecret) {
+        throw new AppError(GENERIC_LOGIN_ERROR, HttpStatus.UNAUTHORIZED);
+      }
+
+      if (user.twoFactorLockedUntil && user.twoFactorLockedUntil > new Date()) {
+        const remainingMinutes = Math.ceil(
+          (user.twoFactorLockedUntil.getTime() - Date.now()) / 60000
+        );
         throw new AppError(
-          `Account is locked. Try again in ${remainingMinutes} minutes(s).`,
+          `Too many failed 2FA attempts. Try again in ${remainingMinutes} minute(s)`,
           HttpStatus.TOO_MANY_REQUEST
         );
       }
 
-      const isValid = await comparePassword(user.passwordHash, password);
-      if (!isValid) {
-        const newFailedAttempts = user.failedLoginAttempts + 1;
-        const shouldLock = newFailedAttempts >= MAX_FAILED_ATTEMPTS;
+      let isValid2FA = false;
+      let usedBackupCode = false;
+      let updatedBackupCodes = user.twoFactorBackupCodes;
 
-        await tx.user.update({
+      isValid2FA = authenticator.check(twoFactorCode, user.twoFactorSecret);
+
+      if (!isValid2FA && user.twoFactorBackupCodes.length > 0) {
+        const hashedCode = hashBackupCode(twoFactorCode);
+        const backupCodeIndex = user.twoFactorBackupCodes.indexOf(hashedCode);
+
+        if (backupCodeIndex !== -1) {
+          isValid2FA = true;
+          usedBackupCode = true;
+
+          updatedBackupCodes = user.twoFactorBackupCodes.filter(
+            (_, index) => index !== backupCodeIndex
+          );
+        }
+      }
+
+      if (!isValid2FA) {
+        const newAttempts = user.twoFactorFailedAttempts + 1;
+        const shouldLock = newAttempts >= 5;
+
+        await prisma.user.update({
           where: { id: user.id },
           data: {
-            failedLoginAttempts: newFailedAttempts,
-            lockedUntil: shouldLock
-              ? new Date(Date.now() + LOCKOUT_DURATION_MS)
+            twoFactorFailedAttempts: newAttempts,
+            twoFactorLockedUntil: shouldLock
+              ? new Date(Date.now() + 15 * 60 * 1000)
               : null,
           },
         });
@@ -196,13 +257,25 @@ export class AuthService {
         throw new AppError(GENERIC_LOGIN_ERROR, HttpStatus.UNAUTHORIZED);
       }
 
-      if (!user.isEmailVerified) {
-        throw new AppError(GENERIC_LOGIN_ERROR, HttpStatus.UNAUTHORIZED);
+      if (usedBackupCode) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            twoFactorBackupCodes: updatedBackupCodes,
+          },
+        });
       }
+    }
 
+    return prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: user.id },
-        data: { failedLoginAttempts: 0, lockedUntil: null },
+        data: {
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+          twoFactorFailedAttempts: 0,
+          twoFactorLockedUntil: null,
+        },
       });
 
       await tx.loginHistory.create({
@@ -494,6 +567,132 @@ export class AuthService {
       );
     } catch (error) {
       throw new AppError('Invalid or expired token', HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  async setup2FA(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) throw new AppError('User not found', HttpStatus.NOT_FOUND);
+
+    if (user.twoFactorEnabled) {
+      throw new AppError('2FA is already enabled', HttpStatus.BAD_REQUEST);
+    }
+
+    const secret = authenticator.generateSecret();
+    const otpAuthUrl = authenticator.keyuri(user.email, 'AuthApp', secret);
+
+    const backUpCodes = generateBackupCodes();
+    const hashedBackupCodes = backUpCodes.map(hashBackupCode);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorPendingSecret: secret,
+        twoFactorSetupExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        twoFactorBackupCodes: hashedBackupCodes,
+      },
+    });
+
+    return { secret, otpAuthUrl, backUpCodes };
+  }
+
+  async verify2FA(userId: string, code: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user || !user.twoFactorPendingSecret) {
+      throw new AppError(
+        '2FA setup not initiated. Please start setup first',
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    if (
+      user.twoFactorSetupExpiresAt &&
+      user.twoFactorSetupExpiresAt < new Date()
+    ) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          twoFactorPendingSecret: null,
+          twoFactorSetupExpiresAt: null,
+          twoFactorBackupCodes: [],
+        },
+      });
+
+      throw new AppError(
+        '2FA setup expired. Please start again',
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    const isValid = authenticator.check(code, user.twoFactorPendingSecret);
+    if (!isValid) {
+      throw new AppError('Invalid verification code', HttpStatus.BAD_REQUEST);
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorSecret: user.twoFactorPendingSecret,
+        twoFactorEnabled: true,
+        twoFactorPendingSecret: null,
+        twoFactorSetupExpiresAt: null,
+        tokenVersion: { increment: 1 },
+      },
+    });
+
+    await sendEmail(
+      user.email,
+      'Two-Factor Authentication Enabled',
+      `<p>Two-factor authentication has been successfully enabled on your account.</p>
+      <p>If you didn't make this change, please contact support immediately.</p>`
+    );
+  }
+
+  async disable2FA(userId: string, password: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) throw new AppError('User not found', HttpStatus.NOT_FOUND);
+
+    if (!user.twoFactorEnabled) {
+      throw new AppError('2FA is not enabled', HttpStatus.BAD_REQUEST);
+    }
+
+    const isValid = await comparePassword(user.passwordHash, password);
+    if (!isValid) {
+      throw new AppError('Invalid password', HttpStatus.UNAUTHORIZED);
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorEnabled: false,
+        twoFactorSecret: null,
+        twoFactorPendingSecret: null,
+        twoFactorSetupExpiresAt: null,
+        twoFactorBackupCodes: [],
+        twoFactorFailedAttempts: 0,
+        twoFactorLockedUntil: null,
+        tokenVersion: { increment: 1 },
+      },
+    });
+
+    try {
+      await sendEmail(
+        user.email,
+        'Two-Factor Authentication Disabled',
+        `<p>Two-factor authentication has been disabled on your account.</p>
+        <p>If you didn't make this change, please contact support immediately and change your password.</p>`
+      );
+    } catch (error) {
+      console.error('[ERROR] Failed to send 2FA disable email:', error);
     }
   }
 }

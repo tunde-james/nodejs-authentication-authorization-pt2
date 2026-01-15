@@ -193,3 +193,53 @@ export const resetPassword = async (req: Request, res: Response) => {
     message: 'Password reset successfully',
   });
 };
+
+export const setup2FA = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError('Not authenticated', HttpStatus.UNAUTHORIZED);
+  }
+
+  const data = await authService.setup2FA(req.user.sub);
+
+  res.status(HttpStatus.OK).json({
+    status: 'success',
+    data,
+  });
+};
+
+export const verify2FA = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError('Not authenticated', HttpStatus.UNAUTHORIZED);
+  }
+
+  const { code } = req.body;
+
+  if (!code) {
+    throw new AppError('Verification code is required', HttpStatus.BAD_REQUEST);
+  }
+
+  await authService.verify2FA(req.user.sub, code);
+
+  res.status(HttpStatus.OK).json({
+    status: 'success',
+    message: 'Two-factor authentication enabled successfully',
+  });
+};
+
+export const disable2FA = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError('Not authenticated', HttpStatus.UNAUTHORIZED);
+  }
+
+  const { password } = req.body;
+  if (!password) {
+    throw new AppError('Password is required', HttpStatus.BAD_REQUEST);
+  }
+
+  await authService.disable2FA(req.user.sub, password);
+
+  res.status(HttpStatus.OK).json({
+    status: 'success',
+    message: 'Two-factor authentication disabled successfully',
+  });
+};

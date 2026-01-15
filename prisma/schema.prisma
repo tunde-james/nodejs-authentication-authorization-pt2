@@ -35,6 +35,12 @@ model User {
   twoFactorEnabled Boolean @default(false) @map("two_factor_enabled")
   twoFactorSecret  String? @map("two_factor_secret")
 
+  twoFactorPendingSecret  String?   @map("two_factor_pending_secret")
+  twoFactorSetupExpiresAt DateTime? @map("two_factor_setup_expires_at")
+  twoFactorBackupCodes    String[]  @map("two_factor_backup_codes")
+  twoFactorFailedAttempts Int       @default(0) @map("two_factor_failed_attempts")
+  twoFactorLockedUntil    DateTime? @map("two_factor_locked_until")
+
   tokenVersion Int @default(0) @map("token_version")
 
   resetPasswordToken           String?   @map("reset_password_token")

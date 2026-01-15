@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import * as authController from '../../auth/auth.controller';
 import { asyncHandler } from '../../utils/async-handler';
+import { requireAuth } from '../../middleware/auth';
 
 const router = Router();
 
@@ -260,5 +261,81 @@ router.post('/forgot-password', asyncHandler(authController.forgotPassword));
  *         description: Invalid token
  */
 router.post('/reset-password', asyncHandler(authController.resetPassword));
+
+/**
+ * @swagger
+ * /auth/2fa/setup:
+ *   post:
+ *     summary: Setup two-factor authentication
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 2FA setup data (secret and QR code URL)
+ *       401:
+ *         description: Not authenticated
+ */
+router.post('/2fa/setup', requireAuth, asyncHandler(authController.setup2FA));
+
+/**
+ * @swagger
+ * /auth/2fa/verify:
+ *   post:
+ *     summary: Verify and enable 2FA
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [code]
+ *             properties:
+ *               code:
+ *                 type: string
+ *                 description: 6-digit TOTP code
+ *     responses:
+ *       200:
+ *         description: 2FA enabled
+ *       400:
+ *         description: Invalid code
+ */
+router.post('/2fa/verify', requireAuth, asyncHandler(authController.verify2FA));
+
+/**
+ *  @swagger
+ * /auth/2fa/disable:
+ *   post:
+ *     summary: Disable two-factor authentication
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [password]
+ *             properties:
+ *               password:
+ *                 type: string
+ *                 description: User's current password for verification
+ *     responses:
+ *       200:
+ *         description: 2FA disabled successfully
+ *       400:
+ *         description: 2FA not enabled or missing password
+ *       401:
+ *         description: Invalid password
+ */
+router.post(
+  '/2fa/disable',
+  requireAuth,
+  asyncHandler(authController.disable2FA)
+);
 
 export default router;
