@@ -28,9 +28,10 @@ model User {
   role            Role    @default(USER)
   isEmailVerified Boolean @default(false) @map("is_email_verified")
 
-  profilePicture String? @map("profile_picture")
-  bio            String?
-  phone          String?
+  profilePicture         String? @map("profile_picture")
+  profilePicturePublicId String? @map("profile_picture_public_id")
+  bio                    String?
+  phone                  String?
 
   twoFactorEnabled Boolean @default(false) @map("two_factor_enabled")
   twoFactorSecret  String? @map("two_factor_secret")

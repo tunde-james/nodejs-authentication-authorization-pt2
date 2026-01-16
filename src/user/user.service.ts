@@ -3,6 +3,7 @@ import { HttpStatus } from '../config/http-status.config';
 import { Prisma, Role } from '../generated/prisma/client';
 import { hashedPassword } from '../lib/password-hash';
 import { prisma } from '../lib/prisma';
+import { deleteFromCloudinary } from '../middleware/upload.middleware';
 import { AppError } from '../utils/app-error';
 import {
   RegisterDriverDto,
@@ -227,5 +228,73 @@ export class UserService {
     });
 
     return user;
+  }
+
+  async updateAvatar(userId: string, cloudinaryUrl: string, publicId: string) {
+    return await prisma.$transaction(async (tx) => {
+      const currentUser = await tx.user.findUnique({
+        where: { id: userId },
+        select: { profilePicture: true, profilePicturePublicId: true },
+      });
+
+      if (!currentUser) {
+        throw new AppError('User not found', HttpStatus.NOT_FOUND);
+      }
+
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: {
+          profilePicture: cloudinaryUrl,
+          profilePicturePublicId: publicId,
+        },
+        select: {
+          id: true,
+          profilePicture: true,
+        },
+      });
+
+      if (currentUser.profilePicturePublicId) {
+        deleteFromCloudinary(currentUser.profilePicturePublicId).catch(
+          (err) => {
+            console.error('[updateAvatar] Failed to delete old avatar', err);
+          }
+        );
+      }
+
+      return user;
+    });
+  }
+
+  async deleteAvatar(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { profilePicture: true, profilePicturePublicId: true },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', HttpStatus.NOT_FOUND);
+    }
+
+    if (!user.profilePicture || !user.profilePicturePublicId) {
+      throw new AppError('No avatar to delete', HttpStatus.BAD_REQUEST);
+    }
+
+    const deleted = await deleteFromCloudinary(user.profilePicturePublicId);
+
+    if (!deleted) {
+      console.warn(
+        `[deleteAvatar] Failed to delete from Cloudinary, but continuing with DB cleanup`
+      );
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        profilePicture: null,
+        profilePicturePublicId: null,
+      },
+    });
+
+    return { message: 'Avatar deleted successfully' };
   }
 }

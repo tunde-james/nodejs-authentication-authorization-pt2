@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { asyncHandler } from '../../utils/async-handler';
 import * as userController from '../../user/user.controller';
 import { requireAuth } from '../../middleware/auth';
+import { avatarUpload } from '../../middleware/upload.middleware';
 
 const router = Router();
 
@@ -155,5 +156,61 @@ router.get('/me', requireAuth, asyncHandler(userController.getMe));
  *         description: Not authenticated
  */
 router.patch('/me', requireAuth, asyncHandler(userController.updateMe));
+
+/**
+ * @swagger
+ * /users/me/avatar:
+ *   post:
+ *     summary: Upload profile picture
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               avatar:
+ *                 type: string
+ *                 format: binary
+ *                 description: JPEG, PNG, or WebP image (max 5MB)
+ *     responses:
+ *       200:
+ *         description: Avatar uploaded
+ *       400:
+ *         description: Invalid file
+ *       401:
+ *         description: Not authenticated
+ */
+router.post(
+  '/me/avatar',
+  requireAuth,
+  ...avatarUpload,
+  asyncHandler(userController.uploadAvatar)
+);
+
+/**
+ * @swagger
+ * /users/me/avatar:
+ *   delete:
+ *     summary: Delete profile picture
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Avatar deleted
+ *       400:
+ *         description: No avatar to delete
+ *       401:
+ *         description: Not authenticated
+ */
+router.delete(
+  '/me/avatar',
+  requireAuth,
+  asyncHandler(userController.deleteAvatar)
+);
 
 export default router;

@@ -11,6 +11,7 @@ import { UserService } from './user.service';
 import { HttpStatus } from '../config/http-status.config';
 import { AuthService } from '../auth/auth.service';
 import { AppError } from '../utils/app-error';
+import { deleteFromCloudinary } from '../middleware/upload.middleware';
 
 const userService = new UserService();
 const authService = new AuthService();
@@ -102,5 +103,63 @@ export const updateMe = async (req: Request, res: Response) => {
   res.status(HttpStatus.OK).json({
     status: 'success',
     data: profile,
+  });
+};
+
+export const uploadAvatar = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError('Not authenticated', HttpStatus.UNAUTHORIZED);
+  }
+
+  if (!req.file) {
+    throw new AppError('No file uploaded', HttpStatus.BAD_REQUEST);
+  }
+
+  const cloudinaryUrl = req.file.path;
+  const publicId = req.file.filename;
+
+  if (!cloudinaryUrl || !publicId) {
+    throw new AppError(
+      'Upload failed: Missing file information',
+      HttpStatus.INTERNAL_SERVER_ERROR
+    );
+  }
+
+  try {
+    const profile = await userService.updateAvatar(
+      req.user.sub,
+      cloudinaryUrl,
+      publicId
+    );
+
+    res.status(HttpStatus.OK).json({
+      status: 'success',
+      data: {
+        profilePicture: profile.profilePicture,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+      },
+    });
+  } catch (error) {
+    console.error('[uploadAvatar] Database update failed, cleaning up:', error);
+
+    await deleteFromCloudinary(publicId).catch((err) => {
+      console.error('Failed to cleanup orphaned file:', err);
+    });
+    
+    throw error;
+  }
+};
+
+export const deleteAvatar = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError('Not authenticated', HttpStatus.UNAUTHORIZED);
+  }
+
+  const result = await userService.deleteAvatar(req.user.sub);
+
+  res.status(HttpStatus.OK).json({
+    status: 'success',
+    message: result.message,
   });
 };
