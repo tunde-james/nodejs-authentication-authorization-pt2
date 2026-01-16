@@ -8,6 +8,7 @@ import {
   RegisterDriverDto,
   RegisterDto,
   RegisterRestaurantDto,
+  UpdateProfileDto,
 } from './user.schema';
 
 export interface CreatedUser {
@@ -168,5 +169,63 @@ export class UserService {
 
       return newUser;
     });
+  }
+
+  async getProfile(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        email: true,
+        name: true,
+        role: true,
+        profilePicture: true,
+        bio: true,
+        phone: true,
+        isEmailVerified: true,
+        twoFactorEnabled: true,
+        driverProfile: {
+          select: {
+            licenseNumber: true,
+            vehicleType: true,
+            isVerified: true,
+          },
+        },
+        restaurantProfile: {
+          select: {
+            restaurantName: true,
+            address: true,
+            isVerified: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', HttpStatus.NOT_FOUND);
+    }
+
+    return user;
+  }
+
+  async updateProfile(userId: string, data: UpdateProfileDto) {
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        name: data.name,
+        bio: data.bio,
+        phone: data.phone,
+      },
+      select: {
+        email: true,
+        name: true,
+        role: true,
+        profilePicture: true,
+        bio: true,
+        phone: true,
+        updatedAt: true,
+      },
+    });
+
+    return user;
   }
 }

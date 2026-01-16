@@ -14,3 +14,7 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
+
+// To generate a QR cod:
+// 1. Get totp url from the 2FA setup endpoint response
+// 2. Run: pnpm dlx ts-node scripts/totp-qr.ts "otpauth://totp/NodeAdvancedAuthApp:tundejames%40example.com?secret=OJ3R2GZ4D5ICGK3M&period=30&digits=6&algorithm=SHA1&issuer=NodeAdvancedAuthApp" 

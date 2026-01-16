@@ -4,11 +4,13 @@ import {
   registerDriverSchema,
   registerRestaurantSchema,
   registerSchema,
+  updateProfileSchema,
 } from './user.schema';
 import { extractDeviceInfo, getClientIp } from '../lib/device-info';
 import { UserService } from './user.service';
 import { HttpStatus } from '../config/http-status.config';
 import { AuthService } from '../auth/auth.service';
+import { AppError } from '../utils/app-error';
 
 const userService = new UserService();
 const authService = new AuthService();
@@ -43,12 +45,7 @@ export const registerDriver = async (req: Request, res: Response) => {
   const user = await userService.createDriver(data, deviceInfo);
 
   await authService
-    .sendVerificationEmail(
-      user.id,
-      user.email,
-      data.name,
-      user.role
-    )
+    .sendVerificationEmail(user.id, user.email, data.name, user.role)
     .catch((err) => {
       console.error('Failed to send verification email:', err);
     });
@@ -79,5 +76,31 @@ export const registerRestaurant = async (req: Request, res: Response) => {
     status: 'success',
     message:
       'Restaurant registration successful. Please check your email to verify your account.',
+  });
+};
+
+export const getMe = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError('Not authenticated', HttpStatus.UNAUTHORIZED);
+  }
+
+  const profile = await userService.getProfile(req.user.sub);
+
+  res.status(HttpStatus.OK).json({
+    status: 'success',
+    data: profile,
+  });
+};
+
+export const updateMe = async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new AppError('Not authenticated', HttpStatus.UNAUTHORIZED);
+  }
+
+  const data = updateProfileSchema.parse(req.body);
+  const profile = await userService.updateProfile(req.user.sub, data);
+  res.status(HttpStatus.OK).json({
+    status: 'success',
+    data: profile,
   });
 };

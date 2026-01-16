@@ -365,6 +365,7 @@ export class AuthService {
       const user = await prisma.user.findUnique({
         where: { id: payload.sub },
       });
+
       if (!user || user.tokenVersion !== payload.tokenVersion) {
         throw new AppError('Invalid token', HttpStatus.UNAUTHORIZED);
       }
@@ -374,6 +375,11 @@ export class AuthService {
           jti: payload.jti,
           expiresAt: new Date(payload.exp * 1000),
         },
+      });
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { tokenVersion: { increment: 1 } },
       });
     } catch (error) {
       if (env.NODE_ENV === 'development') {

@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import { asyncHandler } from '../../utils/async-handler';
 import * as userController from '../../user/user.controller';
+import { requireAuth } from '../../middleware/auth';
 
 const router = Router();
 
@@ -106,5 +107,53 @@ router.post(
   '/register/restaurant',
   asyncHandler(userController.registerRestaurant)
 );
+
+/**
+ * @swagger
+ * /users/me:
+ *   get:
+ *     summary: Get current user profile
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile data
+ *       401:
+ *         description: Not authenticated
+ */
+router.get('/me', requireAuth, asyncHandler(userController.getMe));
+
+/**
+ * @swagger
+ * /users/me:
+ *   patch:
+ *     summary: Update current user profile
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 minLength: 2
+ *               bio:
+ *                 type: string
+ *                 maxLength: 500
+ *               phone:
+ *                 type: string
+ *                 description: International format (e.g., +1234567890)
+ *     responses:
+ *       200:
+ *         description: Profile updated
+ *       401:
+ *         description: Not authenticated
+ */
+router.patch('/me', requireAuth, asyncHandler(userController.updateMe));
 
 export default router;
