@@ -10,6 +10,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
+    "create-admin": "ts-node src/admin/scripts/create-admin.ts",
     "cleanup:tokens": "ts-node src/cleanup-scripts/cleanup-tokens.ts",
     "cleanup:login-history": "ts-node src/cleanup-scripts/cleanup-login-history.ts",
     "cleanup:all": "ts-node -e \"require('./src/cleanup-scripts/cleanup-scheduler').runAllCleanups().then(() => process.exit(0))\""

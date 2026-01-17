@@ -41,7 +41,7 @@ export const requireAuth = async (
   }
 };
 
-export const requireROle = (roles: Role[]) => {
+export const requireRole = (roles: Role[]) => {
   return (req: Request, _res: Response, next: NextFunction) => {
     if (!req.user) {
       return next(new AppError('Not authenticated', HttpStatus.UNAUTHORIZED));
