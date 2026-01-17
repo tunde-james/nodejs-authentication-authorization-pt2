@@ -9,6 +9,8 @@ import { env } from './config/env.config';
 import { requestIdMiddleware } from './middleware/request-id.middleware';
 import userRoutes from './routes/v1/user.routes';
 import authRoutes from './routes/v1/auth.routes';
+import { startCleanupScheduler } from './cleanup-scripts/cleanup-scheduler';
+import { Logger } from './utils/logger';
 
 const app: Express = express();
 
@@ -29,8 +31,8 @@ app.use(
         frameSrc: ["'none'"],
       },
     },
-    crossOriginEmbedderPolicy: false, // Allow embedding images
-  })
+    crossOriginEmbedderPolicy: false,
+  }),
 );
 
 app.use(
@@ -39,7 +41,7 @@ app.use(
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
-  })
+  }),
 );
 
 app.use(cookieParser());
@@ -62,5 +64,13 @@ app.get('/health', (req, res) => {
 });
 
 app.use(errorHandler);
+
+if (env.NODE_ENV === 'production') {
+  try {
+    startCleanupScheduler();
+  } catch (error) {
+    Logger.error(`Failed to start cleanup scheduler: ${error}`);
+  }
+}
 
 export default app;

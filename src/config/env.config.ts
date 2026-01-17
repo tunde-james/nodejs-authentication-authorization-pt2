@@ -1,4 +1,7 @@
+import { config } from 'dotenv';
 import { z } from 'zod';
+
+config()
 
 const envSchema = z.object({
   NODE_ENV: z
@@ -29,9 +32,23 @@ const envSchema = z.object({
   SMTP_PASS: z.string().min(1),
   EMAIL_FROM: z.string(),
 
-  CLOUDINARY_CLOUD_NAME: z.string(),
-  CLOUDINARY_API_KEY: z.string(),
-  CLOUDINARY_API_SECRET: z.string(),
+  CLOUDINARY_CLOUD_NAME: z.string().min(1),
+  CLOUDINARY_API_KEY: z.string().min(1),
+  CLOUDINARY_API_SECRET: z.string().min(1),
+
+  CLEANUP_TOKEN_ENABLED: z
+    .string()
+    .default('true')
+    .transform((val) => val == 'true'),
+  CLEANUP_LOGIN_HISTORY_ENABLED: z
+    .string()
+    .default('true')
+    .transform((val) => val === 'true'),
+  LOGIN_HISTORY_RETENTION_DAYS: z
+    .string()
+    .default('90')
+    .transform((val) => parseInt(val, 10)),
+  CLEANUP_CRON_SCHEDULE: z.string().default('0 3 * * *'), // Daily at 3AM
 });
 
 export const env = envSchema.parse(process.env);
