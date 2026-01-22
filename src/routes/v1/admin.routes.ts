@@ -115,6 +115,7 @@ router.post(
  *       404:
  *         description: User not found
  */
+router.patch('/users/:id/role', asyncHandler(adminController.updateUserRole));
 
 /**
  * @swagger
@@ -139,6 +140,7 @@ router.post(
  *       404:
  *         description: User not found
  */
+router.delete('/user/:id', asyncHandler(adminController.deleteUser));
 
 /**
  * @swagger
@@ -172,5 +174,6 @@ router.post(
  *                     recentRegistrations:
  *                       type: number
  */
+router.get('/stats', asyncHandler(adminController.getPlatformStats));
 
 export default router;

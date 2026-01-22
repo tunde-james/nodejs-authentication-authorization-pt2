@@ -119,4 +119,111 @@ export class AdminService {
 
     return updatedUser;
   }
+
+  async updateUserRole(userId: string, newRole: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, role: true },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', HttpStatus.NOT_FOUND);
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { role: newRole as any },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+      },
+    });
+
+    return updatedUser;
+  }
+
+  async deleteUser(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, role: true },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', HttpStatus.NOT_FOUND);
+    }
+
+    if (user.role === 'ADMIN') {
+      throw (
+        new AppError('Cannot delete admin accounts'),
+        HttpStatus.FORBIDDEN
+      );
+    }
+
+    await prisma.user.delete({
+      where: { id: userId },
+    });
+
+    return { email: user.email };
+  }
+
+  async getPlatformStats() {
+    const [
+      totalUsers,
+      verifiedUsers,
+      usersWithTwoFactor,
+      lockedAccounts,
+      recentRegistrations,
+      usersByRole,
+    ] = await Promise.all([
+      prisma.user.count(),
+
+      prisma.user.count({
+        where: { isEmailVerified: true },
+      }),
+
+      prisma.user.count({
+        where: { twoFactorEnabled: true },
+      }),
+
+      prisma.user.count({
+        where: {
+          lockedUntil: {
+            gt: new Date(),
+          },
+        },
+      }),
+
+      prisma.user.count({
+        where: {
+          createdAt: {
+            gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+          },
+        },
+      }),
+
+      prisma.user.groupBy({
+        by: ['role'],
+        _count: {
+          role: true,
+        },
+      }),
+    ]);
+
+    return {
+      totalUsers,
+      verifiedUsers,
+      usersWithTwoFactor,
+      lockedAccounts,
+      recentRegistrations,
+      usersByRole: usersByRole.reduce(
+        (acc, curr) => {
+          acc[curr.role] = curr._count.role;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
+    };
+  }
 }
